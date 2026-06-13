@@ -1,0 +1,38 @@
+# Example sandboxed container that offloads command execution to the host
+# broker (cli_serve.py running OUTSIDE docker).
+#
+# Build:
+#   docker build -f Dockerfile.example -t cli-serve-demo .
+#
+# Run (host service must already be started with a matching token):
+#   docker run --rm \
+#     --add-host=host.docker.internal:host-gateway \  # needed on Linux; no-op on Docker Desktop
+#     -e CLI_SERVE_TOKEN=yoursecret \
+#     -e CLI_SERVE_URL=http://host.docker.internal:8765 \
+#     cli-serve-demo
+#
+# The container has NO build tools / venv of its own. Anything it cannot run
+# locally, it sends to the host broker via cli_client.py.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Only the client is needed inside the sandbox (stdlib-only, no pip installs).
+COPY cli_client.py /app/cli_client.py
+
+# Reasonable defaults; override at `docker run` time.
+ENV CLI_SERVE_URL=http://host.docker.internal:8765
+
+# Demo entrypoint: prove the host (not the container) executes the command.
+# Compare the in-container python against the host python the broker reports.
+CMD ["sh", "-c", "\
+  echo '--- broker health ---'; \
+  python3 cli_client.py --health; \
+  echo '--- in-container python ---'; \
+  python3 -c 'import sys; print(sys.executable)'; \
+  echo '--- python as seen by the HOST broker (uses host venv if present) ---'; \
+  python3 cli_client.py --shell 'which python && python --version'; \
+  echo '--- run an arbitrary host command ---'; \
+  python3 cli_client.py -- uname -a \
+"]
