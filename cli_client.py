@@ -6,7 +6,7 @@ only, so it runs in a minimal container with no pip installs.
 
 Config via env (overridable by flags):
     CLI_SERVE_URL    base URL of the service (default: http://host.docker.internal:8765)
-    CLI_SERVE_TOKEN  shared secret (required)
+    CLI_SERVE_TOKEN  shared secret (optional; omit if the broker has no token)
 
 CLI usage:
     python3 cli_client.py pytest -q
@@ -52,8 +52,6 @@ def run(
     """
     base = (url or os.environ.get("CLI_SERVE_URL") or DEFAULT_URL).rstrip("/")
     tok = token or os.environ.get("CLI_SERVE_TOKEN")
-    if not tok:
-        raise RuntimeError("CLI_SERVE_TOKEN is not set")
 
     payload: dict = {"command": command, "timeout": timeout}
     if cwd:
@@ -61,13 +59,13 @@ def run(
     if env:
         payload["env"] = env
 
+    headers = {"Content-Type": "application/json"}
+    if tok:  # broker may run without auth; only send a token if we have one
+        headers["Authorization"] = f"Bearer {tok}"
     req = urllib.request.Request(
         f"{base}/run",
         data=json.dumps(payload).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {tok}",
-        },
+        headers=headers,
         method="POST",
     )
     # Local network timeout for the HTTP call: a bit beyond the command timeout.

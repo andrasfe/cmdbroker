@@ -10,11 +10,12 @@ directory is prepended to PATH and VIRTUAL_ENV is set, so commands run as if the
 venv were activated.
 
 Security: this is a remote code execution endpoint by design. It binds to
-127.0.0.1 by default and requires a shared-secret bearer token. Do not expose it
-on a public interface.
+127.0.0.1 by default. Set CLI_SERVE_TOKEN to require a shared-secret bearer
+token; if unset, auth is disabled (a warning is printed). Do not expose it on a
+public interface.
 
 Usage:
-    CLI_SERVE_TOKEN=secret python3 cli_serve.py [--host H] [--port P] [--workdir D]
+    [CLI_SERVE_TOKEN=secret] python3 cli_serve.py [--host H] [--port P] [--workdir D]
 
 Request (POST /run):
     {
@@ -83,6 +84,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _authorized(self) -> bool:
+        if not self.token:  # auth disabled when no token is configured
+            return True
         header = self.headers.get("Authorization", "")
         expected = f"Bearer {self.token}"
         # constant-time-ish comparison
@@ -196,9 +199,13 @@ def main() -> None:
                         help="base directory commands run in (default: cwd)")
     args = parser.parse_args()
 
-    token = os.environ.get("CLI_SERVE_TOKEN")
+    token = os.environ.get("CLI_SERVE_TOKEN", "")
     if not token:
-        sys.exit("error: set CLI_SERVE_TOKEN to a shared secret before starting")
+        sys.stderr.write(
+            "WARNING: CLI_SERVE_TOKEN not set — auth is DISABLED. Anyone who can "
+            "reach this port can run commands as you. Only acceptable on a "
+            "trusted/localhost-only bind.\n"
+        )
 
     Handler.token = token
     Handler.workdir = os.path.abspath(args.workdir)

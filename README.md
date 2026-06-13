@@ -23,7 +23,8 @@ Both scripts are **stdlib-only** — no pip installs anywhere.
 
 ## Quick start
 
-Start the broker on the host (it refuses to start without a token):
+Start the broker on the host (token is optional — omit it for a localhost-only,
+auth-disabled run):
 
 ```bash
 CLI_SERVE_TOKEN=yoursecret python3 cli_serve.py --workdir /path/to/project
@@ -95,7 +96,8 @@ See `Dockerfile.example` for a complete sandbox-to-host demo.
 
 ## Security notes
 
-- `CLI_SERVE_TOKEN` is mandatory; the broker exits if it's unset.
+- `CLI_SERVE_TOKEN` is optional. If unset, auth is **disabled** and the broker
+  prints a warning — only acceptable on a localhost-only / trusted bind.
 - Binds to `127.0.0.1` by default; any other bind prints a warning.
 - `cwd` is confined to `--workdir` (escape attempts are rejected).
 - Commands run as the **host user** — consider running the broker as a
